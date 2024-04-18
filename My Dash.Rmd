@@ -1,0 +1,255 @@
+---
+title: "Pulkit's Dashboard On Online Sales Data"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    social: [ "twitter", "facebook", "menu"]
+    source_code: embed
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(knitr)
+library(DT)
+library(rpivotTable)
+library(ggplot2)
+library(plotly)
+library(dplyr)
+library(openintro)
+library(highcharter)
+library(ggvis)
+library(gridExtra)
+```
+
+```{r}
+data <-read.csv("C:\\Users\\PULKIT\\Downloads\\Details.csv")
+```
+
+# Data Visualization On online Shopping
+
+## Row
+
+### Online Shopping Analysis
+
+```{r}
+valueBox(paste("Online Shopping"),
+         color = "purple")
+```
+
+### Online Shopping Users
+
+```{r}
+valueBox(paste("1500"),
+         icon = "fa-user"
+         ,color = "purple")
+```
+
+### **Total Sales All time**
+
+```{r}
+gauge(round(sum(data$Amount),
+            digits = 5),
+            min = 0,
+            max = 500000,
+            gaugeSectors(success = c(0, 10000),
+                         warning = c(10000, 100000),
+                         danger = c(100000, 1000000),
+                         colors = c("green", "yellow", "darkgreen")))
+```
+### **Average profit per order**
+```{r}
+gauge(round(mean(data$Profit),
+            digits = 3),
+            min = 0,
+            max = 100,
+            gaugeSectors(success = c(0, 20),
+                         warning = c(20, 50),
+                         danger = c(50, 100),
+                         colors = c("green", "yellow", "darkgreen")))
+```
+
+### Electronic
+
+```{r}
+category_counts_electronic <- sum(data$Category == "Electronics")
+valueBox(category_counts_electronic, 
+         icon = "bolt",
+         color = "#800080")
+
+```
+
+### Furniture
+
+```{r}
+# Count occurrences of "Furniture" in the "Category" column
+category_counts <- sum(data$Category == "Furniture")
+
+# Print the count using valueBox
+valueBox(category_counts, 
+         icon = "couch", 
+         color = "purple")
+         #width = 4)
+
+
+```
+
+### Clothing
+
+```{r}
+# Count occurrences of "Electronic" in the "Category" column
+category_counts_clothing <- sum(data$Category == "Clothing")
+
+# Print the count using valueBox with an electricity icon
+valueBox(category_counts_clothing, 
+         icon = "tshirt",
+         color = "purple")
+
+```
+
+Row
+-----------------------------
+
+### Total Amount of Sales According to the Category and Sub-Category
+
+```{r}
+
+# Define colors for each category
+category_colors <- c("Furniture" = "#FFA500", "Electronics" = "#FF5733", "Clothing" = "#800080")
+
+# Arrange the data by category and sub-category
+data <- arrange(data, Category, Sub.Category)
+
+# Create a plot
+p1 <- data %>%
+  group_by(Category, Sub.Category) %>%
+  summarise(Profit = sum(Amount)) %>%
+  plot_ly(x = ~Sub.Category,
+          y = ~Profit,
+          color = ~Category,
+          colors = category_colors,  # Use the defined colors
+          type = 'bar') %>%
+  layout(xaxis = list(title = "Sub-Categories"),
+         yaxis = list(title = 'Total Amount'),
+         barmode = 'stack')#,  # Stack bars for each sub-category
+        # width = 800,        # Set the width
+        # height = 800)       # Set the height
+
+p1
+```
+
+### Payment methods used by customer
+
+```{r}
+p2 <- data %>%
+         group_by(PaymentMode) %>%
+         summarise(count = n()) %>%
+         filter(count>50) %>%
+         plot_ly(labels = ~PaymentMode,
+                 values = ~count,
+                 marker = list(colors =  c("#87CEEB", "#FF7F50", "#90EE90", "#DA70D6","#FFD700"))) %>%
+         add_pie(hole = 0) %>%
+         layout(xaxis = list(zeroline = F,
+                             showline = F,
+                             showticklabels = F,
+                             showgrid = F),
+                yaxis = list(zeroline = F,
+                             showline = F,
+                             showticklabels=F,
+                             showgrid=F))
+p2
+```
+
+# Profit Analysis By per Order_id
+### Total Profit per order
+
+```{r}
+profit_by_order <- aggregate(Profit ~ Order.ID, data = data, FUN = sum)
+
+# Create a scatter plot
+scatter_plot <- plot_ly(profit_by_order,
+                        x = ~Order.ID,
+                        y = ~Profit,
+                        type = "scatter",
+                        mode = "markers",
+                        marker = list(color = "blue", opacity = 0.7),
+                        text = paste("Order ID:", profit_by_order$OrderID,
+                                     "<br>Total Profit:", profit_by_order$Profit),
+                        hoverinfo = "text") %>%
+                layout(xaxis = list(title = "Order ID"),
+                       yaxis = list(title = "Total Profit"),
+                       title = "Total Profit by Order ID Scatter Plot")
+
+scatter_plot
+
+```
+
+# Shopping data of states
+### Scatter Plot of States and total Orders
+
+```{r}
+state_counts <- table(data$State)
+
+# Convert state counts to a data frame
+state_counts_df <- data.frame(State = names(state_counts),
+                              Count = as.numeric(state_counts),
+                              stringsAsFactors = FALSE)
+
+# Arrange states by count in ascending order
+state_counts_df <- state_counts_df[order(state_counts_df$Count), ]
+
+# Create a box plot
+box_plot <- plot_ly(state_counts_df,
+                    x = ~State,
+                    y = ~Count,
+                    type = "bar",
+                    marker = list(color = "blue"),
+                    text = paste("State:", state_counts_df$State,
+                                 "<br>Count:", state_counts_df$Count),
+                    hoverinfo = "text") %>%
+            layout(xaxis = list(title = "State"),
+                   yaxis = list(title = "Count"),
+                   title = "Box Plot of Order Count by State")
+
+box_plot
+
+```
+
+
+# Map
+
+### Map
+
+```{r}
+order<-data %>%
+  group_by(State)%>%
+  summarise(total=n())
+highchart()%>%
+  hc_title(text="Analysis")%>%
+  hc_subtitle(text="Source: Data")%>%
+  hc_add_series_map(usgeojson,order,
+                    name="State",
+                    value="total",
+                    joinBy=c("woename","State"))%>%
+  hc_mapNavigation(enabled = TRUE)
+```
+
+
+# Pivot Table
+
+```{r}
+rpivotTable(data,
+            aggregatorName = "Count",
+            cols= "Quantity",
+            rows = "State",
+            rendererName = "Table")
+```
+
+# Data Table
+```{r}
+datatable(data,
+          caption = "Online Shopping Data",
+          rownames = T,
+          filter = "top",
+          options = list(pageLength = 25))
+```
